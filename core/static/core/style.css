@@ -28,7 +28,7 @@ div.sources {
     box-shadow: 5px 5px 5px;
 }
 
-cite {
+cite, .pasty__source-link {
     font-size: 75%;
     position: absolute;
     right: 10px;

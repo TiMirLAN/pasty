@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+<head lang="ru">
+  <meta charset="UTF-8">
+  <link rel="stylesheet" type="text/css" href="{% static 'core/style.css' %}"/>
+  <title>Пирожки :-)</title>
+</head>
+<body ng-app="Pasties">
+  <div class="box">
+    <div class="wrapper">
+      {% block content %}
+        {% include 'core/includes/pasty.html' %}
+      {% endblock %}
+    </div>
+  </div>
+<!-- SCRIPTS -->
+  {% block js %}
+    {# TODO по-хорошему надо положить angular в статику. #}
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular.min.js"></script>
+    <script type="text/javascript">
+      (function (module) {
+        module.constant('defaultPasty', {{ default_pasty.json_serialize|safe }});
+        module.constant('urls', {
+          randomPasty: '{% url 'one' %}'
+        });
+        module.controller('PastyCtrl', ['$scope', '$http', '$interval', 'defaultPasty', 'urls', pastyCtrl]);
+
+        function pastyCtrl($scope, $http, $interval, $defaultPasty, urls) {
+          $scope.pasty = $defaultPasty;
+          $interval(resetPasty, 15*1000);
+
+          function resetPasty() {
+            $http.get(urls.randomPasty).success(function (response) {
+              $scope.pasty = response;
+            });
+          }
+        }
+      })(angular.module('Pasties', []))
+    </script>
+  {% endblock %}
+</body>
+</html>

@@ -4,6 +4,7 @@ import os
 import re
 from urlparse import urlparse
 from django.db import models
+from json import dumps as json_dump
 
 
 class Pasty(models.Model):
@@ -16,11 +17,19 @@ class Pasty(models.Model):
     def short_text(self):
         return self.text[:37].replace(os.linesep, ' \ ') + '...'
 
+    @property
     def source_title(self):
         return urlparse(self.source).hostname
 
     def __unicode__(self):
         return self.short_text()
+
+    FIELDS_TO_SERIALIZE = 'text', 'source', 'source_title'
+
+    def json_serialize(self):
+        return json_dump(dict(
+            (name, getattr(self, name, '')) for name in self.FIELDS_TO_SERIALIZE
+        ))
 
     @staticmethod
     def rnd():
