@@ -9,6 +9,34 @@ from django.dispatch import receiver
 from os import linesep
 import re
 
+# SOURCE
+class Source(models.Model):
+    title = models.TextField(
+        verbose_name=u'Название источника'
+    )
+    url = models.URLField(
+        verbose_name=u'Ссылка'
+    )
+    sync_url = models.URLField(
+        verbose_name=u'URL синхронизации'
+    )
+    sync_date = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=u'Дата последней синхронизации'
+    )
+    parser_pattern = re.compile('[.-]')
+
+    def __unicode__(self):
+        return self.title
+
+    def parser(self):
+        return self.parser_pattern.sub('_', self.title)
+
+    class Meta:
+        verbose_name = 'Источник'
+        verbose_name_plural = 'Источники'
+
 
 # PASTY
 cache = get_cache('default')
@@ -27,11 +55,26 @@ class PastiesManager(models.Manager):
         return self.get_query_set().get(id=choice(index))
 
 class Pasty(models.Model):
-    text = models.TextField(u'Текст пирожка')
-    date = models.DateTimeField(u'Дата публикации', blank=True, null=True)
-    source = models.URLField(u'Источник', blank=True)
-    votes = models.IntegerField(u'Голосов', default=0, null=True)
-    source_pattern = re.compile(r'''http://(?:www\.)?(.+)''')
+    text = models.TextField(
+        verbose_name=u'Текст'
+    )
+    date = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=u'Дата публикации',
+    )
+    source = models.ForeignKey(
+        to=Source,
+        db_index=True,
+        related_name='pasties',
+        verbose_name='Источник'
+    )
+    votes = models.IntegerField(
+        default=0,
+        null=True,
+        verbose_name=u'Голосов',
+    )
+    # FIXME Зачем тут вообще был source_pattern?
 
     objects = PastiesManager()
 
@@ -44,7 +87,7 @@ class Pasty(models.Model):
 
     @property
     def source_title(self):
-        return urlparse(self.source).hostname
+        return urlparse(self.source.url).hostname
 
     def __unicode__(self):
         return self.text
@@ -74,22 +117,3 @@ class Pasty(models.Model):
 def reset_pasties_index_cache_on_signal(sender, **kwargs):
     if kwargs.get('created', True):
         _reset_pasties_index_cache(Pasty.objects)
-
-
-# SOURCE
-class Source(models.Model):
-    title = models.TextField(u'Название источника')
-    url = models.URLField(u'Ссылка')
-    sync_url = models.URLField(u'URL синхронизации', blank=True)
-    sync_date = models.DateTimeField(u'Дата последней синхронизации', blank=True, null=True)
-    parser_pattern = re.compile('[.-]')
-
-    def __unicode__(self):
-        return self.title
-
-    def parser(self):
-        return self.parser_pattern.sub('_', self.title)
-
-    class Meta:
-        verbose_name = 'Источник'
-        verbose_name_plural = 'Источники'
