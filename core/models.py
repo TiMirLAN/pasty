@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
-
-import os
-import re
+from __future__ import unicode_literals
 from urlparse import urlparse
 from django.db import models
 from json import dumps as json_dump
 from django.core.cache import get_cache
 from random import choice
 from django.dispatch import receiver
+from os import linesep
+import re
 
+
+# PASTY
 cache = get_cache('default')
 PASTIES_INDEX_CACHE_KEY = 'pasties_index'
 
@@ -33,15 +35,19 @@ class Pasty(models.Model):
 
     objects = PastiesManager()
 
-    def short_text(self):
-        return self.text[:37].replace(os.linesep, ' \ ') + '...'
+    # FIXME просто нет особого смысла
+    # def short_text(self):
+    #     return self.text[:37].replace(linesep, ' \ ') + '...'
+
+    def html(self):
+        return self.text.replace(linesep, '</br>')
 
     @property
     def source_title(self):
         return urlparse(self.source).hostname
 
     def __unicode__(self):
-        return self.short_text()
+        return self.text
 
     FIELDS_TO_SERIALIZE = 'text', 'source_title'
 
@@ -59,6 +65,10 @@ class Pasty(models.Model):
     #         return None
     #     return Pasty.objects.order_by('?')[0]
 
+    class Meta:
+        verbose_name = 'Пирожок'
+        verbose_name_plural = 'Пирожки'
+
 @receiver(models.signals.post_delete, sender=Pasty)
 @receiver(models.signals.post_save, sender=Pasty)
 def reset_pasties_index_cache_on_signal(sender, **kwargs):
@@ -66,7 +76,7 @@ def reset_pasties_index_cache_on_signal(sender, **kwargs):
         _reset_pasties_index_cache(Pasty.objects)
 
 
-
+# SOURCE
 class Source(models.Model):
     title = models.TextField(u'Название источника')
     url = models.URLField(u'Ссылка')
@@ -79,3 +89,7 @@ class Source(models.Model):
 
     def parser(self):
         return self.parser_pattern.sub('_', self.title)
+
+    class Meta:
+        verbose_name = 'Источник'
+        verbose_name_plural = 'Источники'
