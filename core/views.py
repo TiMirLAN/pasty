@@ -15,7 +15,7 @@ class IndexView(DetailView):
     context_object_name = 'default_pasty'
 
     def get_object(self, queryset=None):
-        return self.model.objects.select_related('source').get_random()
+        return self.model.objects.get_random()
 index = IndexView.as_view()
 
 
@@ -47,7 +47,7 @@ index = IndexView.as_view()
 
 def one(request):
     return HttpResponse(
-        Pasty.objects.select_related('source').get_random().json_serialize(),
+        Pasty.objects.get_random().json_serialize(),
         mimetype='application/json'
     )
     # p = Pasty.rnd()

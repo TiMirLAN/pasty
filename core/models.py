@@ -41,18 +41,27 @@ class Source(models.Model):
 # PASTY
 cache = get_cache('default')
 PASTIES_INDEX_CACHE_KEY = 'pasties_index'
+PASTIES_BLOCKS_CACHE_KEY = 'pasties_blocks'
 
 def _reset_pasties_index_cache(queryset):
-    index = tuple(queryset.values_list('id', flat=True))
+    index, votes = zip(*queryset.only('id', 'votes').order_by('votes').values_list('id', 'votes'))
+    blocks_offset, max_votes, length = [0], votes[0], len(votes)
+    for idx,  vts in enumerate(votes):
+        if vts > max_votes:
+            max_votes = vts
+            blocks_offset.append(idx-length)
     cache.set(PASTIES_INDEX_CACHE_KEY, index)
-    return index
+    cache.set(PASTIES_BLOCKS_CACHE_KEY, blocks_offset)
+    return index, blocks_offset
 
 class PastiesManager(models.Manager):
     def get_random(self):
         index = cache.get(PASTIES_INDEX_CACHE_KEY)
+        offsets = cache.get(PASTIES_BLOCKS_CACHE_KEY)
         if not index:
-            index = _reset_pasties_index_cache(self.get_query_set())
-        return self.get_query_set().get(id=choice(index))
+            index, offsets = _reset_pasties_index_cache(self.get_query_set())
+        ids_block = index[choice(offsets):]
+        return self.get_query_set().select_related('source').get(id=choice(ids_block))
 
 class Pasty(models.Model):
     text = models.TextField(
