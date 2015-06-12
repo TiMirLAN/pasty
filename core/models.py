@@ -1,42 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from urlparse import urlparse
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from json import dumps as json_dump
 from django.core.cache import get_cache
 from random import choice
 from django.dispatch import receiver
 from os import linesep
+from django.template.defaultfilters import striptags
+from .parsers import rss, perashki_ru, stishkipirozhki_ru
 import re
-
-# SOURCE
-class Source(models.Model):
-    title = models.TextField(
-        verbose_name=u'Название источника'
-    )
-    url = models.URLField(
-        verbose_name=u'Ссылка'
-    )
-    sync_url = models.URLField(
-        verbose_name=u'URL синхронизации'
-    )
-    sync_date = models.DateTimeField(
-        blank=True,
-        null=True,
-        verbose_name=u'Дата последней синхронизации'
-    )
-    parser_pattern = re.compile('[.-]')
-
-    def __unicode__(self):
-        return self.title
-
-    def parser(self):
-        return self.parser_pattern.sub('_', self.title)
-
-    class Meta:
-        verbose_name = 'Источник'
-        verbose_name_plural = 'Источники'
-
 
 # PASTY
 cache = get_cache('default')
@@ -44,12 +18,16 @@ PASTIES_INDEX_CACHE_KEY = 'pasties_index'
 PASTIES_BLOCKS_CACHE_KEY = 'pasties_blocks'
 
 def _reset_pasties_index_cache(queryset):
-    index, votes = zip(*queryset.only('id', 'votes').order_by('votes').values_list('id', 'votes'))
-    blocks_offset, max_votes, length = [0], votes[0], len(votes)
-    for idx,  vts in enumerate(votes):
-        if vts > max_votes:
-            max_votes = vts
-            blocks_offset.append(idx-length)
+    data = queryset.only('id', 'votes').order_by('votes').values_list('id', 'votes')
+    if data:
+        index, votes = zip(*data)
+        blocks_offset, max_votes, length = [0], votes[0], len(votes)
+        for idx,  vts in enumerate(votes):
+            if vts > max_votes:
+                max_votes = vts
+                blocks_offset.append(idx-length)
+    else:
+        index, blocks_offset = [], []
     cache.set(PASTIES_INDEX_CACHE_KEY, index)
     cache.set(PASTIES_BLOCKS_CACHE_KEY, blocks_offset)
     return index, blocks_offset
@@ -73,7 +51,7 @@ class Pasty(models.Model):
         verbose_name=u'Дата публикации',
     )
     source = models.ForeignKey(
-        to=Source,
+        to='Source',
         db_index=True,
         related_name='pasties',
         verbose_name='Источник'
@@ -126,3 +104,58 @@ class Pasty(models.Model):
 def reset_pasties_index_cache_on_signal(sender, **kwargs):
     if kwargs.get('created', True):
         _reset_pasties_index_cache(Pasty.objects)
+
+# SOURCE
+PARSERS = dict((f.func_name, f) for f in [rss, stishkipirozhki_ru, perashki_ru])
+
+class Source(models.Model):
+    title = models.TextField(
+        verbose_name=u'Название источника'
+    )
+    url = models.URLField(
+        verbose_name=u'Ссылка'
+    )
+    sync_url = models.URLField(
+        verbose_name=u'URL синхронизации'
+    )
+    sync_date = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=u'Дата последней синхронизации'
+    )
+    parser_name = models.CharField(
+        max_length=20,
+        default=PARSERS.keys()[0],
+        choices=tuple((k, k) for k in PARSERS.keys()),
+        verbose_name='Парсер'
+    )
+
+    def __unicode__(self):
+        return self.title
+
+    @property
+    def parser(self):
+        return PARSERS[self.parser_name]
+
+    @staticmethod
+    def _make_text(html):
+        return striptags(html.replace('<br />', '\n'))
+
+    def sync(self):
+        try:
+            newer_then = self.pasties.only('date').latest('date').date
+        except ObjectDoesNotExist:
+            newer_then = None
+        entries = self.parser(self.sync_url, newer_then)
+        pasties = [Pasty(
+            text=self._make_text(entry['html']),
+            date=entry['published'],
+            source=self
+        ) for entry in entries]
+        # TODO нужно что-то более умное для фильтра.
+        self.pasties.bulk_create([p for p in pasties if len(p.text.split('\n')) == 4])
+
+    class Meta:
+        verbose_name = 'Источник'
+        verbose_name_plural = 'Источники'
+
