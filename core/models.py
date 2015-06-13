@@ -10,7 +10,6 @@ from django.dispatch import receiver
 from os import linesep
 from django.template.defaultfilters import striptags
 from .parsers import rss, perashki_ru, stishkipirozhki_ru
-import re
 
 # PASTY
 cache = get_cache('default')
