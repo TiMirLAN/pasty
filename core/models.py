@@ -128,6 +128,13 @@ class Source(models.Model):
         choices=tuple((k, k) for k in PARSERS.keys()),
         verbose_name='Парсер'
     )
+    STATES = 'Ошибка', 'Синхронизация', 'Готов'
+    state_code = models.SmallIntegerField(
+        default=2,
+        editable=False,
+        choices=tuple(s for s in enumerate(STATES)),
+        verbose_name='Состояние'
+    )
 
     def __unicode__(self):
         return self.title
@@ -140,19 +147,29 @@ class Source(models.Model):
     def _make_text(html):
         return striptags(html.replace('<br />', '\n'))
 
+    def _set_state_code(self, code):
+        self.state_code = code
+        self.save()
+
     def sync(self):
+        self._set_state_code(1)
         try:
             newer_then = self.pasties.only('date').latest('date').date
         except ObjectDoesNotExist:
             newer_then = None
-        entries = self.parser(self.sync_url, newer_then)
-        pasties = [Pasty(
-            text=self._make_text(entry['html']),
-            date=entry['published'],
-            source=self
-        ) for entry in entries]
-        # TODO нужно что-то более умное для фильтра.
-        self.pasties.bulk_create([p for p in pasties if len(p.text.split('\n')) == 4])
+        try:
+            entries = self.parser(self.sync_url, newer_then)
+            pasties = [Pasty(
+                text=self._make_text(entry['html']),
+                date=entry['published'],
+                source=self
+            ) for entry in entries]
+            # TODO нужно что-то более умное для фильтра.
+            self.pasties.bulk_create([p for p in pasties if len(p.text.split('\n')) == 4])
+            self._set_state_code(2)
+        except Exception as e:
+            self._set_state_code(0)
+            raise e
 
     class Meta:
         verbose_name = 'Источник'

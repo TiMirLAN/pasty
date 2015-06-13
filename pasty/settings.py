@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import os
 
 PROJECT_ROOT = os.path.normpath(os.path.dirname(__file__))
@@ -150,4 +151,17 @@ LOGGING = {
             'propagate': True,
         },
     }
+}
+
+# CELERY
+from datetime import timedelta
+from celery.schedules import crontab
+BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_TIMEZONE = TIME_ZONE
+CELERYBEAT_SCHEDULE = {
+    'update-pasties': dict(
+        task='core.tasks.sync_sources',
+        schedule=crontab(minute=0, hour='*/4')
+    )
 }
