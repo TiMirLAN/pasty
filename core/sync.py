@@ -29,6 +29,7 @@ def sync_rss_source(source):
 
 
 # TODO: how should I parse perashki.ru?!
+# TODO: using beatifulsoup4
 
 def strip(text):
     strip_pattern = re.compile('</?p>|</?div>')

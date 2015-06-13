@@ -60,13 +60,8 @@ class Pasty(models.Model):
         null=True,
         verbose_name=u'Голосов',
     )
-    # FIXME Зачем тут вообще был source_pattern?
 
     objects = PastiesManager()
-
-    # FIXME просто нет особого смысла
-    # def short_text(self):
-    #     return self.text[:37].replace(linesep, ' \ ') + '...'
 
     def html(self):
         return self.text.replace(linesep, '</br>')
@@ -84,15 +79,6 @@ class Pasty(models.Model):
         return json_dump(dict(
             (name, getattr(self, name, '')) for name in self.FIELDS_TO_SERIALIZE
         ))
-
-    # FIXME мог бы быть @classmethod, было бы логичней
-    # FIXME два запроса это слишком, можно было бы отлавливать IndexError
-    # FIXME Долгий order_by('?')
-    # @staticmethod
-    # def rnd():
-    #     if Pasty.objects.count() == 0:
-    #         return None
-    #     return Pasty.objects.order_by('?')[0]
 
     class Meta:
         verbose_name = 'Пирожок'
